@@ -54,8 +54,6 @@ class ModelWithPrivateFields(models.Model):
     Django will not allow you to run `TestModel.objects.filter(_TestModel__state='blah')`
     because it will see `__` in the param and try to make join using missing field `_TestModel`.
 
-    Monkey patching of the `init_name_map` method, resolves this problem.
-
     Another obstacle is that you can't pass short field names into the class's constructor like that:
     `obj = TestModel(state='blah')`, because Django does not know about `state` attribute, but is
     aware of `_TestModel__state`. That is why `PrivateFieldsMetaclass` mangles such keyword attributes
@@ -78,21 +76,6 @@ class ModelWithPrivateFields(models.Model):
             if prefix + key in field_names:
                 key = prefix + key
             new_kwargs[key] = value
-
-        _init_name_map_orig = self._meta.init_name_map
-
-        def init_name_map(self):
-            cache = _init_name_map_orig()
-
-            for key, value in cache.items():
-                match = re.match(r'^_.+__(.*)', key)
-                if match is not None:
-                    cache[match.group(1)] = value
-            return cache
-        init_name_map.patched = True
-
-        if not getattr(self._meta.init_name_map, 'patched', False):
-            self._meta.init_name_map = type(_init_name_map_orig)(init_name_map, type(self._meta))
 
         super(ModelWithPrivateFields, self).__init__(*args, **new_kwargs)
 
